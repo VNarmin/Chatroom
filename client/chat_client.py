@@ -4,11 +4,10 @@ import threading
 
 class ChatClient :
     def __init__(self) :
-        self.client_sock = None                    # the client socket object to be created
-        self.username = None                       # to store the username when logged in
-        self.listener_event = threading.Event()    # the event to signal the listener thread to stop
-        self.listener_thread = None                # the listener thread object
-        self.current_room = None                   # to keep track of the current room the client is in
+        self.client_sock = None                   # the client socket object to be created
+        self.username = None                      # to store the username when logged in
+        self.listener_event = threading.Event()   # the event to signal the listener thread to stop
+        self.listener_thread = None               # the listener thread object
 
     # used to create a socket object and connect the client to the server
     # creates a new socket object using the AF_INET address family (IPv4) and the SOCK_STREAM type (TCP)
@@ -155,10 +154,6 @@ class ChatClient :
             except socket.timeout :
                 if self.listener_event.is_set() :
                     break
-            except (socket.error, ConnectionResetError) as exception :
-                print(f"Error receiving the message : {exception}")
-                self.client_sock.close()
-                exit(1)
 
     # manages the chatting session
     # starts by clearing the listener_event and launching a listener thread to handle incoming messages
@@ -175,11 +170,8 @@ class ChatClient :
             message = input()
             if message.lower() == 'quit' :
                 action = {"action" : "disconnect"}
-                try :
-                    self.client_sock.send(json.dumps(action).encode('utf-8'))
-                    print("You left the room...")
-                except (socket.error, ConnectionResetError) as exception :
-                    print(f"Error disconnecting the user from the room : {exception}")
+                self.client_sock.send(json.dumps(action).encode('utf-8'))
+                print("You left the room...")
 
                 # stop the listener thread by setting the event
                 self.listener_event.set()
@@ -187,9 +179,10 @@ class ChatClient :
                 # wait for the listener thread to finish
                 self.listener_thread.join()
 
-                # return to the main menu after quitting the chatroom
-                self.current_room = None
                 break
+            else :
+                action = {"action" : "send_message", "message" : message}
+                self.client_sock.send(json.dumps(action).encode('utf-8'))
 
     # controls the main flow of the program, guiding the user through registration or login
     # then provides a command prompt for the user to interact with the chatroom system

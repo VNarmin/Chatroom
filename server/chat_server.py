@@ -99,7 +99,7 @@ def join_room(client_socket, username, room_ID, room_password) :
     cursor.close()
     conn.close()
 
-    if room :
+    if room is not None :
         with clients_lock :
             clients[client_socket] = {'username' : username, 'room_ID' : room_ID}
 
@@ -110,6 +110,7 @@ def join_room(client_socket, username, room_ID, room_password) :
         print(f"{username} joined room {room_ID}.")
     else :
         client_socket.send(json.dumps({"code" : 400, "message" : "Invalid room ID or password!"}).encode())
+        return
 
     try :
         with open(f"{room_ID}.txt", "r") as chat_file :
@@ -211,13 +212,12 @@ def handle_client(client_socket) :
                     broadcast_message(username, formatted_message, room_ID)
 
             elif data["action"] == "disconnect" :
-                print(f"{username} disconnected.")
+                print(f"{username} disconnected...")
                 with clients_lock :
                     if client_socket in clients :
                         del clients[client_socket]
                         if room_ID in room_last_activity :
                             del room_last_activity[room_ID]
-                break
 
         except (ConnectionAbortedError, ConnectionResetError) as exception :
             print(f"Connection error with client {username if username else 'unknown'} : {exception}")
@@ -265,15 +265,15 @@ def start_server() :
         global is_running
         while is_running :
             try :
-                client_socket, addr = server_socket.accept()
-                print(f"Connection from {addr}")
-                threading.Thread(target=handle_client, args=(client_socket,)).start()
+                client_sock, addr = server_socket.accept()
+                print(f"\nConnection from {addr}")
+                threading.Thread(target = handle_client, args = (client_sock,)).start()
             except OSError :
                 if not is_running :
                     break
 
-    threading.Thread(target=accept_clients, daemon=True).start()
-    threading.Thread(target=check_inactivity, daemon=True).start()
+    threading.Thread(target = accept_clients, daemon = True).start()
+    threading.Thread(target = check_inactivity, daemon = True).start()
 
     while True :
         command = input("Enter 'shutdown' to stop the server : ").strip().lower()
@@ -281,6 +281,8 @@ def start_server() :
             is_running = False
             server_socket.close()
             print("Server is shutting down...")
+
+            log_shutdown_time()
 
             with clients_lock :
                 for client_socket in list(clients.keys()) :
@@ -293,6 +295,11 @@ def start_server() :
                 clients.clear()
             print("All clients have been disconnected...")
             break
+
+def log_shutdown_time() :
+    current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    with open("logs.txt", "a") as log_file :
+        log_file.write(f"SERVER was closed at {current_time}.\n")
 
 if __name__ == "__main__" :
     try :
