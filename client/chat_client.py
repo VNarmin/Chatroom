@@ -154,6 +154,9 @@ class ChatClient :
             except socket.timeout :
                 if self.listener_event.is_set() :
                     break
+            except (socket.error, ConnectionResetError) as exception :
+                print(f"Error : {exception}")
+                return
 
     # manages the chatting session
     # starts by clearing the listener_event and launching a listener thread to handle incoming messages
